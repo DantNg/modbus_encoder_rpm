@@ -50,7 +50,7 @@ UartReceiver_t uart_rx;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-uint32_t PPR 	= 1000;
+uint32_t PPR 	= 600;
 float DIA	 	= 0.25f;
 uint32_t TIME 	= 100;
 int64_t pulse_t = 0;
