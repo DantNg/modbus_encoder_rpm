@@ -29,6 +29,7 @@
 #include "modbus_master/modbus_master.h"
 #include "modbus_slave/modbus_slave.h"
 #include <stdlib.h>
+#include <math.h>
 #include "wifi_command/wifi_command.h"
 /* USER CODE END Includes */
 
@@ -53,7 +54,7 @@ uint32_t PPR 	= 1000;
 float DIA	 	= 0.25f;
 uint32_t TIME 	= 100;
 int64_t pulse_t = 0;
-float rpm;
+int rpm;
 
 // TIM4 time-base variables
 volatile uint32_t tim4_overflow_count = 0;
@@ -124,9 +125,9 @@ void update_RPM() {
 	uint32_t now = GetMillis();
 
 	if (now - last_log_time >= TIME) {
-		rpm = Encoder_GetRPM(&enc2);
+		rpm = (int)roundf(Encoder_GetRPM(&enc2));
 		// Debug: Print RPM with precise timing
-		printf("RPM: %.2f (dt=%lums, precise_time=%lu)\r\n", 
+		printf("RPM: %d (dt=%lums, precise_time=%lu)\r\n", 
 		       rpm, now - last_log_time, now);
 		last_log_time = now;
 	}
@@ -306,9 +307,8 @@ int main(void)
 	  pulse_t = Encoder_GetPulse(&enc2);
 // -------------------------- Update Encoder ---------------------
 	  update_RPM();
-	  uint16_t *value_rpm = (uint16_t*) &rpm;
-	  holding_regs[5] = value_rpm[1];
-	  holding_regs[6] = value_rpm[0];
+	  holding_regs[5] = (uint16_t)(rpm & 0xFFFF);
+	  holding_regs[6] = (uint16_t)((rpm >> 16) & 0xFFFF);
 	  queue_frame_t frame;
 	  if (queue_pop(&frame)) {
 		  printf("📥 Processing %d byte\n", frame.len);
