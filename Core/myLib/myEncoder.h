@@ -15,20 +15,20 @@ typedef struct {
     TIM_HandleTypeDef* htim;
     int16_t ppr;                 // Pulse per revolution (đã nhân 4 nếu dùng encoder x4)
     float wheel_diameter_m;     // Đường kính bánh xe (m)
-    uint32_t update_us;         // Chu kỳ lấy mẫu tính RPM (microseconds)
+    uint16_t update_ms;         // Chu kỳ lấy mẫu tính RPM (ms)
     int64_t total_pulse;        // Tổng số xung encoder (gồm cả phần tràn)
-    uint64_t last_time_us;      // Lần đo trước đó (microseconds)
+    uint32_t last_time_ms;      // Lần đo trước đó (milliseconds)
     int64_t last_total_pulse;   // Tổng xung lần đo trước
 } Encoder_t;
 
-static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_t ppr, float diameter_m, uint32_t update_us) {
+static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_t ppr, float diameter_m, uint16_t update_ms) {
     enc->htim = htim;
     enc->ppr = ppr * 4;  // dùng chế độ encoder x4
     enc->wheel_diameter_m = diameter_m;
-    enc->update_us = update_us;
+    enc->update_ms = update_ms;
     enc->total_pulse = 0;
     enc->last_total_pulse = 0;
-    enc->last_time_us = GetMicros64();  // Use microsecond-based timing
+    enc->last_time_ms = GetMillis();  // Use TIM4-based millisecond timing
 
     HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(htim, 0);
@@ -48,20 +48,20 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
 
 // Gọi hàm này định kỳ để lấy RPM
 static inline float Encoder_GetRPM(Encoder_t* enc) {
-    uint64_t now_us = GetMicros64();  // Use precise microsecond timing
-    uint64_t dt_us = now_us - enc->last_time_us;
+    uint32_t now_ms = GetMillis();  // Use TIM4-based millisecond timing
+    uint32_t dt_ms = now_ms - enc->last_time_ms;
     
     // Optional: Check if enough time has passed
-//    if (dt_us < enc->update_us) return 0.0f;
+//    if (dt_ms < enc->update_ms) return 0.0f;
 
     int64_t pulse_now = enc->total_pulse + (int64_t)__HAL_TIM_GET_COUNTER(enc->htim);
     int64_t delta = pulse_now - enc->last_total_pulse;
 
     enc->last_total_pulse = pulse_now;
-    enc->last_time_us = now_us;
+    enc->last_time_ms = now_ms;
 
     float rev = (float)delta / (float)enc->ppr;
-    float minutes = (float)dt_us / 60000000.0f;  // Convert microseconds to minutes
+    float minutes = (float)dt_ms / 60000.0f;  // Convert milliseconds to minutes
     return rev / minutes;
 }
 
