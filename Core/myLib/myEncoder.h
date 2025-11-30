@@ -4,14 +4,19 @@
 #include "stm32f1xx_hal.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
+#include <stdio.h>
 #define M_PI 3.14159265f
 
 // External functions for precise timing (implemented in main.c)
 extern uint32_t GetMicros(void);
 extern uint32_t GetMillis(void);
 extern uint64_t GetMicros64(void);
-extern uint64_t GetMicros64(void);
 
+// RPM Moving Average Configuration
+#define RPM_BUFFER_SIZE 30
+
+// Encoder configuration structure
 typedef struct {
     TIM_HandleTypeDef* htim;
     int16_t ppr;                 // Pulse per revolution (đã nhân 4 nếu dùng encoder x4)
@@ -20,16 +25,40 @@ typedef struct {
     int64_t total_pulse;        // Tổng số xung encoder (gồm cả phần tràn)
     uint32_t last_time_ms;      // Lần đo trước đó (milliseconds)
     int64_t last_total_pulse;   // Tổng xung lần đo trước
+    
+    // Moving average for RPM
+    float rpm_buffer[RPM_BUFFER_SIZE];
+    uint8_t rpm_buffer_index;
+    uint8_t rpm_buffer_count;
+    float rpm_average;
+    float current_rpm;
+    
+    // Timing control
+    uint32_t last_update_time_us;
+    uint32_t update_interval_us;
 } Encoder_t;
 
-static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_t ppr, float diameter_m, uint16_t update_ms) {
+static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_t ppr, float diameter_m, uint32_t update_interval_us) {
     enc->htim = htim;
     enc->ppr = ppr * 4;  // dùng chế độ encoder x4
     enc->wheel_diameter_m = diameter_m;
-    enc->update_ms = update_ms;
+    enc->update_ms = update_interval_us / 1000;
     enc->total_pulse = 0;
     enc->last_total_pulse = 0;
     enc->last_time_ms = GetMicros() / 1000;  // Use precise microsecond timing converted to ms
+    
+    // Initialize moving average
+    for(int i = 0; i < RPM_BUFFER_SIZE; i++) {
+        enc->rpm_buffer[i] = 0.0f;
+    }
+    enc->rpm_buffer_index = 0;
+    enc->rpm_buffer_count = 0;
+    enc->rpm_average = 0.0f;
+    enc->current_rpm = 0.0f;
+    
+    // Initialize timing control
+    enc->last_update_time_us = GetMicros();
+    enc->update_interval_us = update_interval_us;
 
     HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(htim, 0);
@@ -64,6 +93,55 @@ static inline float Encoder_GetRPM(Encoder_t* enc) {
     float rev = (float)delta / (float)enc->ppr;
     float minutes = (float)dt_ms / 60000.0f;  // Convert milliseconds to minutes
     return rev / minutes;
+}
+
+// Moving average function for RPM smoothing
+static inline float Encoder_UpdateRPMAverage(Encoder_t* enc, float new_rpm) {
+    // Add new value to circular buffer
+    enc->rpm_buffer[enc->rpm_buffer_index] = new_rpm;
+    enc->rpm_buffer_index = (enc->rpm_buffer_index + 1) % RPM_BUFFER_SIZE;
+    
+    // Track how many values we have
+    if (enc->rpm_buffer_count < RPM_BUFFER_SIZE) {
+        enc->rpm_buffer_count++;
+    }
+    
+    // Calculate average
+    float sum = 0.0f;
+    for (uint8_t i = 0; i < enc->rpm_buffer_count; i++) {
+        sum += enc->rpm_buffer[i];
+    }
+    
+    enc->rpm_average = sum / enc->rpm_buffer_count;
+    return enc->rpm_average;
+}
+
+// Main update function - call this periodically
+static inline void Encoder_Update(Encoder_t* enc) {
+    uint32_t now_us = GetMicros();
+    
+    if ((now_us - enc->last_update_time_us) >= enc->update_interval_us) {
+        float raw_rpm = Encoder_GetRPM(enc);
+        enc->current_rpm = Encoder_UpdateRPMAverage(enc, raw_rpm);
+        
+        // Debug output
+        uint32_t dt_us = now_us - enc->last_update_time_us;
+        printf("RPM: raw=%.1f, smooth=%.1f, display=%d (dt=%lu.%03lums)\r\n", 
+               raw_rpm, enc->current_rpm, (int)roundf(enc->current_rpm), 
+               dt_us/1000, dt_us%1000);
+               
+        enc->last_update_time_us = now_us;
+    }
+}
+
+// Get current smoothed RPM value
+static inline float Encoder_GetSmoothedRPM(Encoder_t* enc) {
+    return enc->current_rpm;
+}
+
+// Get RPM as integer for display/transmission
+static inline int Encoder_GetRPMInt(Encoder_t* enc) {
+    return (int)roundf(enc->current_rpm);
 }
 
 // Tính quãng đường đã đi (mét)
