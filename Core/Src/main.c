@@ -56,6 +56,13 @@ uint32_t TIME 	= 100000;  // 100ms in microseconds
 int64_t pulse_t = 0;
 int rpm;
 
+// Moving average for RPM
+#define RPM_BUFFER_SIZE 10
+static float rpm_buffer[RPM_BUFFER_SIZE];
+static uint8_t rpm_buffer_index = 0;
+static uint8_t rpm_buffer_count = 0;
+static float rpm_average = 0.0f;
+
 // TIM4 time-base variables
 volatile uint32_t tim4_overflow_count = 0;
 /* USER CODE END PM */
@@ -121,6 +128,27 @@ uint64_t GetMicros64(void) {
     return (uint64_t)tim4_overflow_count * 65536ULL + __HAL_TIM_GET_COUNTER(&htim4);
 }
 
+// Moving average function for RPM smoothing
+float update_rpm_average(float new_rpm) {
+    // Add new value to circular buffer
+    rpm_buffer[rpm_buffer_index] = new_rpm;
+    rpm_buffer_index = (rpm_buffer_index + 1) % RPM_BUFFER_SIZE;
+    
+    // Track how many values we have
+    if (rpm_buffer_count < RPM_BUFFER_SIZE) {
+        rpm_buffer_count++;
+    }
+    
+    // Calculate average
+    float sum = 0.0f;
+    for (uint8_t i = 0; i < rpm_buffer_count; i++) {
+        sum += rpm_buffer[i];
+    }
+    
+    rpm_average = sum / rpm_buffer_count;
+    return rpm_average;
+}
+
 // Debug function to test timing accuracy
 void test_timing_accuracy(void) {
     static uint32_t last_test_time = 0;
@@ -142,11 +170,14 @@ void update_RPM() {
 	uint64_t now_us = GetMicros64();
 
 	if ((now_us - last_log_time_us) >= TIME) {  // Direct microsecond comparison
-		rpm = (int)roundf(Encoder_GetRPM(&enc2));
-		// Debug: Print RPM with precise timing in microseconds
+		float raw_rpm = Encoder_GetRPM(&enc2);
+		float smooth_rpm = update_rpm_average(raw_rpm);
+		rpm = (int)roundf(smooth_rpm);
+		
+		// Debug: Print both raw and smoothed RPM
 		uint64_t dt_us = now_us - last_log_time_us;
-		printf("RPM: %d (dt=%lluus, precise_time=%llu)\r\n", 
-		       rpm, dt_us, now_us);
+		printf("RPM: raw=%.1f, smooth=%.1f, final=%d (dt=%lluus)\r\n", 
+		       raw_rpm, smooth_rpm, rpm, dt_us);
 		last_log_time_us = now_us;
 	}
 }
