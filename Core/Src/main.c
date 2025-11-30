@@ -52,7 +52,7 @@ UartReceiver_t uart_rx;
 /* USER CODE BEGIN PM */
 uint32_t PPR 	= 600;
 float DIA	 	= 0.25f;
-uint32_t TIME 	= 100;
+uint32_t TIME 	= 100000;  // 100ms in microseconds
 int64_t pulse_t = 0;
 int rpm;
 
@@ -141,12 +141,12 @@ void update_RPM() {
 	static uint64_t last_log_time_us = 0;
 	uint64_t now_us = GetMicros64();
 
-	if ((now_us - last_log_time_us) >= (TIME * 1000ULL)) {  // Convert ms to us
+	if ((now_us - last_log_time_us) >= TIME) {  // Direct microsecond comparison
 		rpm = (int)roundf(Encoder_GetRPM(&enc2));
-		// Debug: Print RPM with precise timing
-		uint32_t dt_us = (uint32_t)(now_us - last_log_time_us);
-		printf("RPM: %d (dt=%lu.%03lums, precise_time=%llu)\r\n", 
-		       rpm, dt_us/1000, dt_us%1000, now_us);
+		// Debug: Print RPM with precise timing in microseconds
+		uint64_t dt_us = now_us - last_log_time_us;
+		printf("RPM: %d (dt=%lluus, precise_time=%llu)\r\n", 
+		       rpm, dt_us, now_us);
 		last_log_time_us = now_us;
 	}
 }
@@ -193,9 +193,9 @@ void on_write_single_register(uint16_t addr, uint16_t value) {
 		break; // đường kính (mm)
 	case 2:
 		holding_regs[2] = value;
-		TIME = value;
+		TIME = value * 1000;  // Convert ms to us for internal storage
 		myFlash_Write(FLASH_PAGE_TIME, TIME);
-		break; // thời gian lấy mẫu (ms)
+		break; // thời gian lấy mẫu (ms input, stored as us)
 	default:
 		break;
 	}
@@ -214,7 +214,7 @@ void modbus_slave_setup() {
 	modbus_slave_init(&huart3, &slave_cfg);
 	holding_regs[0] = PPR;  // số xung
 	holding_regs[1] = DIA*1000;  // đường kính (mm)
-	holding_regs[2] = TIME; // thời gian lấy mẫu(ms)
+	holding_regs[2] = TIME / 1000; // thời gian lấy mẫu (convert us to ms for display)
 }
 
 
@@ -320,7 +320,7 @@ int main(void)
 // ------------------------------- Receive UART ------------------------------
 		holding_regs[0] = PPR;  // số xung
 		holding_regs[1] = DIA*1000;  // đường kính (mm)
-		holding_regs[2] = TIME; // thời gian lấy mẫu(ms)
+		holding_regs[2] = TIME / 1000; // thời gian lấy mẫu (convert us to ms for display)
 
 	  pulse_t = Encoder_GetPulse(&enc2);
 // -------------------------- Update Encoder ---------------------
