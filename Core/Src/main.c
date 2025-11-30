@@ -52,7 +52,7 @@ UartReceiver_t uart_rx;
 /* USER CODE BEGIN PM */
 uint32_t PPR 	= 600;
 float DIA	 	= 0.25f;
-uint32_t TIME 	= 100;  // 100ms
+uint32_t TIME 	= 100000;  // 100ms in microseconds
 int64_t pulse_t = 0;
 float rpm;
 
@@ -166,18 +166,18 @@ void test_timing_accuracy(void) {
 
 #ifndef M_LENGTH
 void update_RPM() {
-	static uint32_t last_log_time_ms = 0;
-	uint32_t now_ms = GetMillis();
+	static uint32_t last_log_time_us = 0;
+	uint32_t now_us = GetMicros();
 
-	if ((now_ms - last_log_time_ms) >= TIME) {  // Simple millisecond comparison
+	if ((now_us - last_log_time_us) >= TIME) {  // Microsecond comparison
 		float raw_rpm = Encoder_GetRPM(&enc2);
 		rpm = update_rpm_average(raw_rpm);  // Store as float
 		
 		// Debug: Print both raw and smoothed RPM
-		uint32_t dt_ms = now_ms - last_log_time_ms;
-		printf("RPM: raw=%.1f, smooth=%.1f, display=%d (dt=%lums)\r\n", 
-		       raw_rpm, rpm, (int)roundf(rpm), dt_ms);
-		last_log_time_ms = now_ms;
+		uint32_t dt_us = now_us - last_log_time_us;
+		printf("RPM: raw=%.1f, smooth=%.1f, display=%d (dt=%lu.%03lums)\r\n", 
+		       raw_rpm, rpm, (int)roundf(rpm), dt_us/1000, dt_us%1000);
+		last_log_time_us = now_us;
 	}
 }
 #endif
@@ -223,9 +223,9 @@ void on_write_single_register(uint16_t addr, uint16_t value) {
 		break; // đường kính (mm)
 	case 2:
 		holding_regs[2] = value;
-		TIME = value;  // Direct ms storage
+		TIME = value * 1000;  // Convert ms input to microseconds
 		myFlash_Write(FLASH_PAGE_TIME, TIME);
-		break; // thời gian lấy mẫu (ms)
+		break; // thời gian lấy mẫu (ms input, stored as us)
 	default:
 		break;
 	}
@@ -244,7 +244,7 @@ void modbus_slave_setup() {
 	modbus_slave_init(&huart3, &slave_cfg);
 	holding_regs[0] = PPR;  // số xung
 	holding_regs[1] = DIA*1000;  // đường kính (mm)
-	holding_regs[2] = TIME; // thời gian lấy mẫu (ms)
+	holding_regs[2] = TIME / 1000; // thời gian lấy mẫu (display as ms)
 }
 
 
@@ -350,7 +350,7 @@ int main(void)
 // ------------------------------- Receive UART ------------------------------
 		holding_regs[0] = PPR;  // số xung
 		holding_regs[1] = DIA*1000;  // đường kính (mm)
-		holding_regs[2] = TIME; // thời gian lấy mẫu (ms)
+		holding_regs[2] = TIME / 1000; // thời gian lấy mẫu (display as ms)
 
 	  pulse_t = Encoder_GetPulse(&enc2);
 // -------------------------- Update Encoder ---------------------

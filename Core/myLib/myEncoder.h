@@ -10,6 +10,7 @@
 extern uint32_t GetMicros(void);
 extern uint32_t GetMillis(void);
 extern uint64_t GetMicros64(void);
+extern uint64_t GetMicros64(void);
 
 typedef struct {
     TIM_HandleTypeDef* htim;
@@ -28,7 +29,7 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
     enc->update_ms = update_ms;
     enc->total_pulse = 0;
     enc->last_total_pulse = 0;
-    enc->last_time_ms = GetMillis();  // Use TIM4-based millisecond timing
+    enc->last_time_ms = GetMicros() / 1000;  // Use precise microsecond timing converted to ms
 
     HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(htim, 0);
@@ -48,7 +49,7 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
 
 // Gọi hàm này định kỳ để lấy RPM
 static inline float Encoder_GetRPM(Encoder_t* enc) {
-    uint32_t now_ms = GetMillis();  // Use TIM4-based millisecond timing
+    uint32_t now_ms = GetMicros() / 1000;  // Use precise microsecond timing
     uint32_t dt_ms = now_ms - enc->last_time_ms;
     
     // Optional: Check if enough time has passed
