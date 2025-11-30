@@ -248,71 +248,6 @@ int main(void)
 
   // ----------------- IWDG -------------------------------
   HAL_IWDG_Init(&hiwdg);
-
-  // ------------------ FLASH ----------------------------
-  if(myFlash_Read(FLASH_PAGE_PPR) != 0xFFFFFFFF)
-	  PPR = myFlash_Read(FLASH_PAGE_PPR);
-  if(myFlash_Read(FLASH_PAGE_DIA) != 0xFFFFFFFF)
-	  DIA = *(float*)&(uint32_t){ myFlash_Read(FLASH_PAGE_DIA)};
-  if(myFlash_Read(FLASH_PAGE_TIME) != 0xFFFFFFFF)
-	  TIME = myFlash_Read(FLASH_PAGE_TIME);
-  if(myFlash_Read(FLASH_PAGE_BAUD) != 0xFFFFFFFF)
-  {
-	  huart1.Init.BaudRate = myFlash_Read(FLASH_PAGE_BAUD);
-	  huart3.Init.BaudRate = myFlash_Read(FLASH_PAGE_BAUD);
-	  HAL_UART_DeInit(&huart1);
-	  HAL_UART_Init(&huart1);
-	  HAL_UART_DeInit(&huart3);
-	  HAL_UART_Init(&huart3);
-	  // ----------------- UART3 -----------------------------
-	  HAL_UART_Receive_DMA(&huart3, uart_rx_buffer, UART_RX_BUFFER_SIZE);
-	  __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-	  modbus_slave_setup();
-
-	  // ----------------- UART1 -----------------------------
-	  MyUart_Init(&uart_rx, &huart1);
-	  HAL_UART_Receive_IT(&huart1, &uart_byte, 1);
-  }
-  if(myFlash_Read(FLASH_PAGE_PARITY) != 0xFFFFFFFF)
-  {
-	  parity = myFlash_Read(FLASH_PAGE_PARITY);
-	  switch(parity) {
-	  case 0:
-		  huart1.Init.Parity = UART_PARITY_NONE;
-		  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-		  huart3.Init.Parity = UART_PARITY_NONE;
-  		  huart3.Init.WordLength = UART_WORDLENGTH_8B;
-		  break;
-	  case 1:
-		  huart1.Init.Parity = UART_PARITY_ODD;
-		  huart1.Init.WordLength = UART_WORDLENGTH_9B;
-		  huart3.Init.Parity = UART_PARITY_ODD;
-  		  huart3.Init.WordLength = UART_WORDLENGTH_9B;
-		  break;
-	  case 2:
-		  huart1.Init.Parity = UART_PARITY_EVEN;
-		  huart1.Init.WordLength = UART_WORDLENGTH_9B;
-		  huart3.Init.Parity = UART_PARITY_EVEN;
-  		  huart3.Init.WordLength = UART_WORDLENGTH_9B;
-		  break;
-	  default:
-		  break;
-	  }
-	  HAL_UART_DeInit(&huart1);
-	  HAL_UART_Init(&huart1);
-	  HAL_UART_DeInit(&huart3);
-	  HAL_UART_Init(&huart3);
-	  // ----------------- UART3 -----------------------------
-	  HAL_UART_Receive_DMA(&huart3, uart_rx_buffer, UART_RX_BUFFER_SIZE);
-	  __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-	  modbus_slave_setup();
-
-	  // ----------------- UART1 -----------------------------
-	  MyUart_Init(&uart_rx, &huart1);
-	  HAL_UART_Receive_IT(&huart1, &uart_byte, 1);
-  }
-  len_val = myFlash_Read(FLASH_PAGE_LENGTH);
-
   Encoder_Init(&enc2, &htim2, PPR, DIA, TIME);
 
   /* USER CODE END 2 */
@@ -325,129 +260,16 @@ int main(void)
 	  HAL_IWDG_Refresh(&hiwdg);
 
 // ------------------------------- Receive UART ------------------------------
-	  if (uart_rx.has_command) {
-#ifdef M_LENGTH
-	      myFlash_Write(FLASH_PAGE_LENGTH, *(uint32_t*)&length);
-	      len_val = myFlash_Read(FLASH_PAGE_LENGTH);
-#endif
-	      if (strcmp(uart_rx.command, "PPR") == 0) {
-	    	  myFlash_Write(FLASH_PAGE_PPR, atoi(uart_rx.value));
-	    	  PPR = myFlash_Read(FLASH_PAGE_PPR);
-	      } else if (strcmp(uart_rx.command, "DIA") == 0) {
-	    	  dia_val = atof(uart_rx.value);  // chuyển chuỗi thành float
-	    	  myFlash_Write(FLASH_PAGE_DIA, *(uint32_t*)&dia_val);
-	    	  DIA = *(float*)&(uint32_t){ myFlash_Read(FLASH_PAGE_DIA) };
-	      } else if (strcmp(uart_rx.command, "TIME") == 0) {
-	    	  myFlash_Write(FLASH_PAGE_TIME, atoi(uart_rx.value));
-	    	  TIME = myFlash_Read(FLASH_PAGE_TIME);
-	      } else if(strcmp(uart_rx.command, "BAUD") == 0) {
-	    	  myFlash_Write(FLASH_PAGE_BAUD, atoi(uart_rx.value));
-	    	  huart1.Init.BaudRate = atoi(uart_rx.value);
-	    	  huart3.Init.BaudRate = atoi(uart_rx.value);
-
-//	    	  huart1.Init.BaudRate = myFlash_Read(FLASH_PAGE_BAUD);
-//	    	  huart3.Init.BaudRate = myFlash_Read(FLASH_PAGE_BAUD);
-	    	  HAL_UART_DeInit(&huart1);
-	    	  HAL_UART_Init(&huart1);
-	    	  HAL_UART_DeInit(&huart3);
-	    	  HAL_UART_Init(&huart3);
-	    	  // ----------------- UART3 -----------------------------
-	    	  HAL_UART_Receive_DMA(&huart3, uart_rx_buffer, UART_RX_BUFFER_SIZE);
-	    	  __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-	    	  modbus_slave_setup();
-
-	    	  // ----------------- UART1 -----------------------------
-	    	  MyUart_Init(&uart_rx, &huart1);
-	    	  HAL_UART_Receive_IT(&huart1, &uart_byte, 1);
-	      } else if(strcmp(uart_rx.command, "PARITY") == 0) {
-	    	  myFlash_Write(FLASH_PAGE_PARITY, atoi(uart_rx.value));
-	    	  parity = myFlash_Read(FLASH_PAGE_PARITY);
-	    	  switch(parity) {
-	    	  case 0:
-	    		  huart1.Init.Parity = UART_PARITY_NONE;
-	    		  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	    		  huart3.Init.Parity = UART_PARITY_NONE;
-  	    		  huart3.Init.WordLength = UART_WORDLENGTH_8B;
-	    		  break;
-	    	  case 1:
-	    		  huart1.Init.Parity = UART_PARITY_ODD;
-	    		  huart1.Init.WordLength = UART_WORDLENGTH_9B;
-	    		  huart3.Init.Parity = UART_PARITY_ODD;
-  	    		  huart3.Init.WordLength = UART_WORDLENGTH_9B;
-	    		  break;
-	    	  case 2:
-	    		  huart1.Init.Parity = UART_PARITY_EVEN;
-	    		  huart1.Init.WordLength = UART_WORDLENGTH_9B;
-	    		  huart3.Init.Parity = UART_PARITY_EVEN;
-  	    		  huart3.Init.WordLength = UART_WORDLENGTH_9B;
-	    		  break;
-	    	  }
-	    	  HAL_UART_DeInit(&huart1);
-	    	  HAL_UART_Init(&huart1);
-	    	  HAL_UART_DeInit(&huart3);
-	    	  HAL_UART_Init(&huart3);
-	    	  // ----------------- UART3 -----------------------------
-	    	  HAL_UART_Receive_DMA(&huart3, uart_rx_buffer, UART_RX_BUFFER_SIZE);
-	    	  __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-	    	  modbus_slave_setup();
-
-	    	  // ----------------- UART1 -----------------------------
-	    	  MyUart_Init(&uart_rx, &huart1);
-	    	  HAL_UART_Receive_IT(&huart1, &uart_byte, 1);
-	      }
-	      Encoder_Init(&enc2, &htim2, (PPR), DIA, TIME);
-	      uart_rx.has_command = 0;
-	      uart_rx.command[0] = '\0';
-	      uart_rx.value[0] = '\0';
-	  }
 		holding_regs[0] = PPR;  // số xung
 		holding_regs[1] = DIA*1000;  // đường kính (mm)
 		holding_regs[2] = TIME; // thời gian lấy mẫu(ms)
 
 	  pulse_t = Encoder_GetPulse(&enc2);
 // -------------------------- Update Encoder ---------------------
-#ifndef M_LENGTH
 	  update_RPM();
 	  uint16_t *value_rpm = (uint16_t*) &rpm;
 	  holding_regs[5] = value_rpm[1];
 	  holding_regs[6] = value_rpm[0];
-#else
-	  if(len_val == 0xFFFFFFFF)
-	  {
-		  test = 1;
-		  length = Encoder_GetLengthMeter(&enc2);
-//		  uint256_from_float_mult(&myEncoder, &len_256, &sign);
-	  }
-	  else
-	  {
-		  test = 2;
-//		  float signed_val = *(float*)&len_val;
-//		  uint256_from_float_mult(&myEncoder, &len_256, &sign);
-
-		  length = Encoder_GetLengthMeter(&enc2) + *(float*)&len_val;
-	  }
-	  uint16_t *value_length = (uint16_t*) &length;
-	  holding_regs[3] = value_length[1];
-	  holding_regs[4] = value_length[0];
-#endif
-	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3) == GPIO_PIN_RESET)
-	  {
-#ifdef M_LENGTH
-		  myFlash_Write(FLASH_PAGE_LENGTH, *(uint32_t*)&length);
-#endif
-		  test = 3;
-		  while(1);
-	  }
-	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_RESET) // Erase all stored data in Flash memory
-	  {
-		  myFlash_ErasePage(FLASH_PAGE_LENGTH);
-		  myFlash_ErasePage(FLASH_PAGE_DIA);
-		  myFlash_ErasePage(FLASH_PAGE_PPR);
-		  myFlash_ErasePage(FLASH_PAGE_TIME);
-		  myFlash_ErasePage(FLASH_PAGE_BAUD);
-		  myFlash_ErasePage(FLASH_PAGE_PARITY);
-		  while(1);
-	  }
 	  queue_frame_t frame;
 	  if (queue_pop(&frame)) {
 		  printf("📥 Processing %d byte\n", frame.len);
