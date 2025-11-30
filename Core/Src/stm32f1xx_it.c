@@ -53,6 +53,7 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+extern TIM_HandleTypeDef htim4;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -260,6 +261,20 @@ void TIM2_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles TIM4 global interrupt.
+  */
+void TIM4_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM4_IRQn 0 */
+
+  /* USER CODE END TIM4_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim4);
+  /* USER CODE BEGIN TIM4_IRQn 1 */
+
+  /* USER CODE END TIM4_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART1 global interrupt.
   */
 void USART1_IRQHandler(void)
@@ -296,6 +311,7 @@ void USART3_IRQHandler(void)
 
 #include "myEncoder.h"   // hoặc tên file chứa struct Encoder_t
 extern Encoder_t enc2;
+extern volatile uint32_t tim4_overflow_count;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -303,6 +319,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 //        enc2.total_pulse += 65536;  // Cộng 1 vòng 16-bit
         int32_t dir = __HAL_TIM_IS_TIM_COUNTING_DOWN(htim) ? -1 : 1;
         enc2.total_pulse += dir * 65536;
+    } else if (htim->Instance == TIM4) {
+        tim4_overflow_count++;
     }
 }
 

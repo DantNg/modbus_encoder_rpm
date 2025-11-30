@@ -54,6 +54,9 @@ float DIA	 	= 0.25f;
 uint32_t TIME 	= 100;
 int64_t pulse_t = 0;
 float rpm;
+
+// TIM4 time-base variables
+volatile uint32_t tim4_overflow_count = 0;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -91,14 +94,40 @@ static void MX_USART3_UART_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
+// TIM4 time-base functions for microsecond precision
+uint32_t GetMicros(void) {
+    return (tim4_overflow_count * 65536UL) + __HAL_TIM_GET_COUNTER(&htim4);
+}
+
+uint32_t GetMillis(void) {
+    return GetMicros() / 1000UL;
+}
+
+// Debug function to test timing accuracy
+void test_timing_accuracy(void) {
+    static uint32_t last_test_time = 0;
+    static uint32_t test_count = 0;
+    
+    uint32_t now_hal = HAL_GetTick();
+    uint32_t now_tim4 = GetMillis();
+    
+    if(now_hal - last_test_time >= 1000) { // Test every second
+        printf("Test #%lu: HAL_GetTick=%lu, TIM4_GetMillis=%lu, diff=%ld\r\n", 
+               ++test_count, now_hal, now_tim4, (int32_t)(now_tim4 - now_hal));
+        last_test_time = now_hal;
+    }
+}
+
 #ifndef M_LENGTH
 void update_RPM() {
 	static uint32_t last_log_time = 0;
-	uint32_t now = HAL_GetTick();
+	uint32_t now = GetMillis();
 
 	if (now - last_log_time >= TIME) {
 		rpm = Encoder_GetRPM(&enc2);
-//			printf("RPM: %.2f\r\n", rpm);
+		// Debug: Print RPM with precise timing
+		printf("RPM: %.2f (dt=%lums, precise_time=%lu)\r\n", 
+		       rpm, now - last_log_time, now);
 		last_log_time = now;
 	}
 }
@@ -246,6 +275,13 @@ int main(void)
   MyUart_Init(&uart_rx, &huart1);
   HAL_UART_Receive_IT(&huart1, &uart_byte, 1);
 
+  // ----------------- TIM4 Time Base ----------------------
+  HAL_TIM_Base_Start_IT(&htim4);  // Start TIM4 with interrupt for overflow counting
+  
+  // Enable TIM4 interrupt
+  HAL_NVIC_SetPriority(TIM4_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(TIM4_IRQn);
+  
   // ----------------- IWDG -------------------------------
   HAL_IWDG_Init(&hiwdg);
   Encoder_Init(&enc2, &htim2, PPR, DIA, TIME);
@@ -258,6 +294,9 @@ int main(void)
   {
 // ------------------------------- Refresh Watchdog --------------------------
 	  HAL_IWDG_Refresh(&hiwdg);
+
+// ------------------------------- Test Timing Accuracy ----------------------
+//	  test_timing_accuracy();
 
 // ------------------------------- Receive UART ------------------------------
 		holding_regs[0] = PPR;  // số xung

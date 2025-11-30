@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #define M_PI 3.14159265f
 
+// External functions for precise timing (implemented in main.c)
+extern uint32_t GetMicros(void);
+extern uint32_t GetMillis(void);
+
 typedef struct {
     TIM_HandleTypeDef* htim;
     int16_t ppr;                 // Pulse per revolution (đã nhân 4 nếu dùng encoder x4)
@@ -23,7 +27,7 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
     enc->update_ms = update_ms;
     enc->total_pulse = 0;
     enc->last_total_pulse = 0;
-    enc->last_time_ms = HAL_GetTick();
+    enc->last_time_ms = GetMillis();  // Use TIM4-based timing
 
     HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(htim, 0);
@@ -43,7 +47,7 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
 
 // Gọi hàm này định kỳ để lấy RPM
 static inline float Encoder_GetRPM(Encoder_t* enc) {
-    uint32_t now = HAL_GetTick();
+    uint32_t now = GetMillis();  // Use TIM4-based timing
     uint32_t dt = now - enc->last_time_ms;
 //    if (dt < enc->update_ms) return 0.0f;
 
