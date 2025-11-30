@@ -54,7 +54,8 @@ uint32_t PPR 	= 600;
 float DIA	 	= 0.25f;
 uint32_t TIME 	= 100000;  // 100ms in microseconds
 int64_t pulse_t = 0;
-
+int rpm_int = 0;
+int speed_m_min =0;
 // TIM4 time-base variables
 volatile uint32_t tim4_overflow_count = 0;
 /* USER CODE END PM */
@@ -309,7 +310,8 @@ int main(void)
 // -------------------------- Update Encoder ---------------------
 	  Encoder_Update(&enc2);
 	  // Convert float RPM to int for Modbus transmission
-	  int rpm_int = Encoder_GetRPMInt(&enc2);
+	  rpm_int = Encoder_GetRPMInt(&enc2);
+    speed_m_min = Encoder_GetMetersPerMinuteInt(&enc2);
 	  holding_regs[5] = (uint16_t)(rpm_int & 0xFFFF);
 	  holding_regs[6] = (uint16_t)((rpm_int >> 16) & 0xFFFF);
 	  queue_frame_t frame;

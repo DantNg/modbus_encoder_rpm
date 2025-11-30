@@ -124,11 +124,12 @@ static inline void Encoder_Update(Encoder_t* enc) {
         float raw_rpm = Encoder_GetRPM(enc);
         enc->current_rpm = Encoder_UpdateRPMAverage(enc, raw_rpm);
         
-        // Debug output
+        // Debug output with speed information
         uint32_t dt_us = now_us - enc->last_update_time_us;
-        printf("RPM: raw=%.1f, smooth=%.1f, display=%d (dt=%lu.%03lums)\r\n", 
-               raw_rpm, enc->current_rpm, (int)roundf(enc->current_rpm), 
-               dt_us/1000, dt_us%1000);
+        float m_per_min = Encoder_GetMetersPerMinute(enc);
+        printf("RPM: %.1f | Speed: %.1f m/min, %.2f m/s, %.2f km/h (dt=%lu.%03lums)\r\n", 
+               enc->current_rpm, m_per_min, Encoder_GetMetersPerSecond(enc), 
+               Encoder_GetKmPerHour(enc), dt_us/1000, dt_us%1000);
                
         enc->last_update_time_us = now_us;
     }
@@ -142,6 +143,28 @@ static inline float Encoder_GetSmoothedRPM(Encoder_t* enc) {
 // Get RPM as integer for display/transmission
 static inline int Encoder_GetRPMInt(Encoder_t* enc) {
     return (int)roundf(enc->current_rpm);
+}
+
+// Calculate meters per minute based on wheel diameter and RPM
+static inline float Encoder_GetMetersPerMinute(Encoder_t* enc) {
+    float circumference_m = enc->wheel_diameter_m * M_PI;  // Circumference in meters
+    return enc->current_rpm * circumference_m;  // RPM * circumference = meters/minute
+}
+
+// Get m/min as integer for display/transmission  
+static inline int Encoder_GetMetersPerMinuteInt(Encoder_t* enc) {
+    return (int)roundf(Encoder_GetMetersPerMinute(enc));
+}
+
+// Calculate speed in m/s (meters per second)
+static inline float Encoder_GetMetersPerSecond(Encoder_t* enc) {
+    return Encoder_GetMetersPerMinute(enc) / 60.0f;
+}
+
+// Calculate speed in km/h (kilometers per hour)
+static inline float Encoder_GetKmPerHour(Encoder_t* enc) {
+    float m_per_min = Encoder_GetMetersPerMinute(enc);
+    return (m_per_min * 60.0f) / 1000.0f;  // Convert m/min to km/h
 }
 
 // Tính quãng đường đã đi (mét)
