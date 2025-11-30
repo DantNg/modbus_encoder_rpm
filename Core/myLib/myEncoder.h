@@ -116,6 +116,28 @@ static inline float Encoder_UpdateRPMAverage(Encoder_t* enc, float new_rpm) {
     return enc->rpm_average;
 }
 
+// Calculate meters per minute based on wheel diameter and RPM
+static inline float Encoder_GetMetersPerMinute(Encoder_t* enc) {
+    float circumference_m = enc->wheel_diameter_m * M_PI;  // Circumference in meters
+    return enc->current_rpm * circumference_m;  // RPM * circumference = meters/minute
+}
+
+// Get m/min as integer for display/transmission  
+static inline int Encoder_GetMetersPerMinuteInt(Encoder_t* enc) {
+    return (int)roundf(Encoder_GetMetersPerMinute(enc));
+}
+
+// Calculate speed in m/s (meters per second)
+static inline float Encoder_GetMetersPerSecond(Encoder_t* enc) {
+    return Encoder_GetMetersPerMinute(enc) / 60.0f;
+}
+
+// Calculate speed in km/h (kilometers per hour)
+static inline float Encoder_GetKmPerHour(Encoder_t* enc) {
+    float m_per_min = Encoder_GetMetersPerMinute(enc);
+    return (m_per_min * 60.0f) / 1000.0f;  // Convert m/min to km/h
+}
+
 // Main update function - call this periodically
 static inline void Encoder_Update(Encoder_t* enc) {
     uint32_t now_us = GetMicros();
@@ -143,28 +165,6 @@ static inline float Encoder_GetSmoothedRPM(Encoder_t* enc) {
 // Get RPM as integer for display/transmission
 static inline int Encoder_GetRPMInt(Encoder_t* enc) {
     return (int)roundf(enc->current_rpm);
-}
-
-// Calculate meters per minute based on wheel diameter and RPM
-static inline float Encoder_GetMetersPerMinute(Encoder_t* enc) {
-    float circumference_m = enc->wheel_diameter_m * M_PI;  // Circumference in meters
-    return enc->current_rpm * circumference_m;  // RPM * circumference = meters/minute
-}
-
-// Get m/min as integer for display/transmission  
-static inline int Encoder_GetMetersPerMinuteInt(Encoder_t* enc) {
-    return (int)roundf(Encoder_GetMetersPerMinute(enc));
-}
-
-// Calculate speed in m/s (meters per second)
-static inline float Encoder_GetMetersPerSecond(Encoder_t* enc) {
-    return Encoder_GetMetersPerMinute(enc) / 60.0f;
-}
-
-// Calculate speed in km/h (kilometers per hour)
-static inline float Encoder_GetKmPerHour(Encoder_t* enc) {
-    float m_per_min = Encoder_GetMetersPerMinute(enc);
-    return (m_per_min * 60.0f) / 1000.0f;  // Convert m/min to km/h
 }
 
 // Tính quãng đường đã đi (mét)
