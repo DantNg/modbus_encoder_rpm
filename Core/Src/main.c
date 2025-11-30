@@ -100,8 +100,25 @@ uint32_t GetMicros(void) {
     return (tim4_overflow_count * 65536UL) + __HAL_TIM_GET_COUNTER(&htim4);
 }
 
+// More precise millisecond function
 uint32_t GetMillis(void) {
-    return GetMicros() / 1000UL;
+    static uint32_t last_micros = 0;
+    static uint32_t millis_count = 0;
+    
+    uint32_t current_micros = GetMicros();
+    
+    // Check if 1000 microseconds have passed
+    if (current_micros - last_micros >= 1000) {
+        millis_count += (current_micros - last_micros) / 1000;
+        last_micros = current_micros - ((current_micros - last_micros) % 1000);
+    }
+    
+    return millis_count;
+}
+
+// Alternative: Direct microsecond-based timing for encoder
+uint64_t GetMicros64(void) {
+    return (uint64_t)tim4_overflow_count * 65536ULL + __HAL_TIM_GET_COUNTER(&htim4);
 }
 
 // Debug function to test timing accuracy
@@ -121,15 +138,16 @@ void test_timing_accuracy(void) {
 
 #ifndef M_LENGTH
 void update_RPM() {
-	static uint32_t last_log_time = 0;
-	uint32_t now = GetMillis();
+	static uint64_t last_log_time_us = 0;
+	uint64_t now_us = GetMicros64();
 
-	if (now - last_log_time >= TIME) {
+	if ((now_us - last_log_time_us) >= (TIME * 1000ULL)) {  // Convert ms to us
 		rpm = (int)roundf(Encoder_GetRPM(&enc2));
 		// Debug: Print RPM with precise timing
-		printf("RPM: %d (dt=%lums, precise_time=%lu)\r\n", 
-		       rpm, now - last_log_time, now);
-		last_log_time = now;
+		uint32_t dt_us = (uint32_t)(now_us - last_log_time_us);
+		printf("RPM: %d (dt=%lu.%03lums, precise_time=%llu)\r\n", 
+		       rpm, dt_us/1000, dt_us%1000, now_us);
+		last_log_time_us = now_us;
 	}
 }
 #endif

@@ -9,6 +9,7 @@
 // External functions for precise timing (implemented in main.c)
 extern uint32_t GetMicros(void);
 extern uint32_t GetMillis(void);
+extern uint64_t GetMicros64(void);
 
 typedef struct {
     TIM_HandleTypeDef* htim;
@@ -16,7 +17,7 @@ typedef struct {
     float wheel_diameter_m;     // Đường kính bánh xe (m)
     uint16_t update_ms;         // Chu kỳ lấy mẫu tính RPM (ms)
     int64_t total_pulse;        // Tổng số xung encoder (gồm cả phần tràn)
-    uint32_t last_time_ms;      // Lần đo trước đó
+    uint64_t last_time_us;      // Lần đo trước đó (microseconds)
     int64_t last_total_pulse;   // Tổng xung lần đo trước
 } Encoder_t;
 
@@ -27,7 +28,7 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
     enc->update_ms = update_ms;
     enc->total_pulse = 0;
     enc->last_total_pulse = 0;
-    enc->last_time_ms = GetMillis();  // Use TIM4-based timing
+    enc->last_time_us = GetMicros64();  // Use microsecond-based timing
 
     HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(htim, 0);
@@ -47,18 +48,21 @@ static inline void Encoder_Init(Encoder_t* enc, TIM_HandleTypeDef* htim, uint16_
 
 // Gọi hàm này định kỳ để lấy RPM
 static inline float Encoder_GetRPM(Encoder_t* enc) {
-    uint32_t now = GetMillis();  // Use TIM4-based timing
-    uint32_t dt = now - enc->last_time_ms;
-//    if (dt < enc->update_ms) return 0.0f;
+    uint64_t now_us = GetMicros64();  // Use precise microsecond timing
+    uint64_t dt_us = now_us - enc->last_time_us;
+    
+    // Convert to milliseconds for comparison
+    uint32_t dt_ms = (uint32_t)(dt_us / 1000ULL);
+//    if (dt_ms < enc->update_ms) return 0.0f;
 
     int64_t pulse_now = enc->total_pulse + (int64_t)__HAL_TIM_GET_COUNTER(enc->htim);
     int64_t delta = pulse_now - enc->last_total_pulse;
 
     enc->last_total_pulse = pulse_now;
-    enc->last_time_ms = now;
+    enc->last_time_us = now_us;
 
     float rev = (float)delta / (float)enc->ppr;
-    float minutes = (float)dt / 60000.0f;
+    float minutes = (float)dt_us / 60000000.0f;  // Convert microseconds to minutes
     return rev / minutes;
 }
 
